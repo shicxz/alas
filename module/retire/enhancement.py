@@ -1,5 +1,6 @@
 from random import choice
 
+import module.config.server as server
 from module.base.timer import Timer
 from module.combat.assets import GET_ITEMS_1
 from module.exception import GameStuckError, ScriptError
@@ -9,8 +10,12 @@ from module.retire.assets import *
 from module.retire.dock import CARD_GRIDS, Dock
 
 VALID_SHIP_TYPES = ['dd', 'ss', 'cl', 'ca', 'bb', 'cv', 'repair', 'others']
-OCR_DOCK_AMOUNT = DigitCounter(
-    DOCK_AMOUNT, letter=(255, 255, 255), threshold=192)
+if server.server != 'jp':
+    OCR_DOCK_AMOUNT = DigitCounter(
+        DOCK_AMOUNT, letter=(255, 255, 255), threshold=192)
+else:
+    OCR_DOCK_AMOUNT = DigitCounter(
+        DOCK_AMOUNT, letter=(201, 201, 201), threshold=192)
 
 
 class Enhancement(Dock):
@@ -49,7 +54,7 @@ class Enhancement(Dock):
         if self.appear(DOCK_EMPTY, offset=(30, 30)):
             return False
 
-        self.equip_enter(
+        self.ship_info_enter(
             CARD_GRIDS[(0, 0)], check_button=SHIP_DETAIL_CHECK, long_click=False)
         return True
 
@@ -127,7 +132,7 @@ class Enhancement(Dock):
                 logger.info(
                     'Reached maximum number to check, exiting current category')
                 return "state_enhance_exit"
-            if not self.equip_side_navbar_ensure(bottom=4):
+            if not self.ship_side_navbar_ensure(bottom=4):
                 return "state_enhance_check"
 
             self.wait_until_appear(ENHANCE_RECOMMEND, offset=(
@@ -189,7 +194,7 @@ class Enhancement(Dock):
                 return "state_enhance_confirm"
 
             # Try to swipe to next
-            if self.equip_view_next(check_button=ENHANCE_RECOMMEND):
+            if self.ship_view_next(check_button=ENHANCE_RECOMMEND):
                 if not need_to_skip:
                     nonlocal ship_count
                     ship_count -= 1

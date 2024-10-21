@@ -6,22 +6,30 @@ import cv2
 import numpy as np
 
 import module.config.server as server
-
 from module.base.button import ButtonGrid
-from module.base.utils import color_similar, crop, get_color, limit_in
+from module.base.utils import color_similar, crop, extract_letters, get_color, limit_in, save_image
 from module.combat.level import LevelOcr
 from module.logger import logger
 from module.ocr.ocr import Digit
 from module.retire.assets import (TEMPLATE_FLEET_1, TEMPLATE_FLEET_2,
                                   TEMPLATE_FLEET_3, TEMPLATE_FLEET_4,
                                   TEMPLATE_FLEET_5, TEMPLATE_FLEET_6,
-                                  TEMPLATE_IN_BATTLE, TEMPLATE_IN_COMMISSION, TEMPLATE_IN_HARD,
+                                  TEMPLATE_IN_BATTLE, TEMPLATE_IN_COMMISSION,
                                   TEMPLATE_IN_EVENT_FLEET)
 from module.retire.dock import (CARD_EMOTION_GRIDS, CARD_GRIDS,
                                 CARD_LEVEL_GRIDS, CARD_RARITY_GRIDS)
 
 
 class EmotionDigit(Digit):
+    def pre_process(self, image):
+        if server.server == 'jp':
+            image_gray = extract_letters(image, letter=(255, 255, 255), threshold=self.threshold)
+            right_side = np.nonzero(image_gray[0:16, :].min(axis=0) > 176)[-1]
+            image = image[:, :right_side[-1]]
+
+        image = super().pre_process(image)
+        return image
+
     def after_process(self, result):
         # Random OCR error on Downes' hair
         # OCR DOCK_EMOTION_OCR: Result "044" is revised to "44"
@@ -139,7 +147,9 @@ class EmotionScanner(Scanner):
                                       name='DOCK_EMOTION_OCR', threshold=176)
         else:
             self.ocr_model = EmotionDigit(self.grids.buttons,
-                                      name='DOCK_EMOTION_OCR', threshold=221)
+                                      name='DOCK_EMOTION_OCR', 
+                                      letter=(201, 201, 201), 
+                                      threshold=176)
 
     def _scan(self, image) -> List:
         return self.ocr_model.ocr(image)
@@ -250,17 +260,10 @@ class StatusScanner(Scanner):
         super().__init__()
         self._results = []
         self.grids = CARD_GRIDS
-        self.value_list: List[str] = [
-            'free',
-            'battle',
-            'commission',
-            'in_hard_fleet',
-            'in_event_fleet',
-        ]
+        self.value_list: List[str] = ['free', 'battle', 'commission']
         self.templates = {
             TEMPLATE_IN_BATTLE: 'battle',
             TEMPLATE_IN_COMMISSION: 'commission',
-            TEMPLATE_IN_HARD: 'in_hard_fleet',
             TEMPLATE_IN_EVENT_FLEET: 'in_event_fleet',
         }
 
@@ -297,13 +300,7 @@ class ShipScanner(Scanner):
         level (tuple): (lower, upper). Will be limited in range [1, 125]
         emotion (tuple): (lower, upper). Will be limited in range [0, 150]
         fleet (int): 0 means not in any fleet. Will be limited in range [0, 6]
-        status (str, list): [
-            'free',
-            'battle',
-            'commission',
-            'in_hard_fleet',
-            'in_event_fleet',
-            ]
+        status (str, list): ['any', 'commission', 'battle']
     """
     def __init__(
         self,
@@ -417,13 +414,7 @@ class ShipScanner(Scanner):
             level (tuple): (lower, upper). Will be limited in range [1, 125]
             emotion (tuple): (lower, upper). Will be limited in range [0, 150]
             fleet (int): 0 means not in any fleet. Will be limited in range [0, 6]
-            status (str, list): [
-                'free',
-                'battle',
-                'commission',
-                'in_hard_fleet',
-                'in_event_fleet',
-                ]
+            status (str, list): ['any', 'commission', 'battle']
         """
         for attr in self.limitaion.keys():
             value = kwargs.get(attr, self.limitaion[attr])
